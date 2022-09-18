@@ -1,18 +1,12 @@
 import uvicorn
 import odrpc
-import json
 import base64
 import logging
 import asyncio
-import threading
 from fastapi import status, FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
-from streamer import Streamer
 from concurrent.futures import ThreadPoolExecutor
-from prometheus_fastapi_instrumentator import Instrumentator
-
-import tracemalloc
 
 
 class API():
@@ -22,20 +16,6 @@ class API():
         self.api = FastAPI()
         # Borrow the uvicorn logger because it's pretty.
         self.logger = logging.getLogger("doods.api")
-
-        # Enable metrics
-        if self.config.metrics:
-            self.instrumentator = Instrumentator(
-                should_ignore_untemplated=True,
-                should_instrument_requests_inprogress=True,
-                excluded_handlers=["/metrics"],
-                inprogress_name="inprogress",
-                inprogress_labels=True,
-            )
-            self.instrumentator.instrument(self.api).expose(self.api)
-
-        if self.config.trace:
-            tracemalloc.start()
 
         @self.api.get("/detectors", response_model=odrpc.DetectorsResponse, response_model_exclude_none=True)
         async def detectors():
@@ -114,62 +94,6 @@ class API():
             if detect_response.error:
                 return Response(status_code=status.HTTP_400_BAD_REQUEST, content=detect_response.error)
             return Response(content=detect_response.image, media_type="image/jpeg")
-
-        @self.api.get("/stream")
-        async def stream(detect_request: str = '{}'):
-            detect_request_dict = json.loads(detect_request)
-            detect_request = odrpc.DetectRequest(**detect_request_dict)
-            # logger.info('stream request: %s', detect_request)
-            detect_request.image = ".jpg" # Must be jpg
-            return StreamingResponse(Streamer.mjpeg_streamer(Streamer(self.doods).start_stream(detect_request)), media_type="multipart/x-mixed-replace;boundary=frame")
-
-        @self.api.websocket("/stream")
-        async def websocket_stream(websocket: WebSocket):
-            await websocket.accept()
-            streamer = None
-            try:
-                # Fetch the initial request payload
-                detect_config = await websocket.receive_json()
-                detect_request = odrpc.DetectRequest(**detect_config)
-
-                # Run the stream detector and return the results.
-                streamer = Streamer(self.doods).start_stream(detect_request)
-                for detect_response in streamer:
-                    # If we requested an image, base64 encode it back to the user
-                    if detect_request.image:
-                        detect_response.image = base64.b64encode(detect_response.image).decode('utf-8')
-                    await websocket.send_json(detect_response.asdict(include_none=False))            
-                    # Fake poll to maintain updated connection state
-                    try:
-                        await asyncio.wait_for(websocket.receive_text(), 0.0001)   
-                    except asyncio.TimeoutError:
-                        pass
-
-            except Exception as e:
-                self.logger.info(e)
-                try:
-                    if streamer:
-                        streamer.send(True) # Stop the streamer
-                except StopIteration:
-                    pass
-
-        @self.api.get("/memory")
-        async def memory():
-            if not self.config.trace:
-                return "Not Enabled"
-            current_mem, peak_mem = tracemalloc.get_traced_memory()
-            overhead = tracemalloc.get_tracemalloc_memory()
-            ret = [ "traced memory: %d KiB  peak: %d KiB  overhead: %d KiB" % (
-                int(current_mem // 1024), int(peak_mem // 1024), int(overhead // 1024)
-            ) ]
-            snapshot = tracemalloc.take_snapshot()
-            stats = snapshot.statistics('lineno')            
-            for trace in stats[:20]:
-                ret.append("%s" % (trace))
-
-            data = {}
-            data['traceback'] = ret
-            return data
 
         # Mount the UI directory - must be last
         self.api.mount("/", StaticFiles(directory="html", html=True), name="static")

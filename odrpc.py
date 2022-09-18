@@ -1,4 +1,3 @@
-import json
 from dataclasses import field, asdict
 from pydantic.dataclasses import dataclass
 from typing import Optional
@@ -24,13 +23,8 @@ class DetectRequest:
     data: str = ""
     preprocess: List[str] = field(default_factory=list)
     detect: Dict[str, float] = field(default_factory=dict)
-    regions: List[DetectRegion] = field(default_factory=list)    
+    regions: List[DetectRegion] = field(default_factory=list)
 
-@dataclass
-class MqttDetectRequest(DetectRequest):
-    separate_detections: Optional[bool] = False
-    crop: Optional[bool] = False
-    binary_images: Optional[bool] = False
 
 @dataclass
 class Detector:
@@ -78,6 +72,7 @@ class DetectResponse:
     def asdict(self, include_none=True):
         ret = asdict(self)
         return ret if include_none else clean_none(ret)
+
 
 def clean_none(d):
     for key, value in list(d.items()):

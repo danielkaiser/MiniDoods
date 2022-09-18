@@ -5,34 +5,14 @@ import cv2
 import odrpc
 import time
 
-from detectors.tensorflow import Tensorflow
-from detectors.tflite import TensorflowLite
+from pytorch import PyTorch
 
 logger = logging.getLogger('doods.doods')
 
 # dict from detector type to class
 detectors = {
-    "tflite": TensorflowLite,
-    "tensorflow": Tensorflow,
+    'pytorch': PyTorch
 }
-
-try:
-    from detectors.pytorch import PyTorch
-    detectors['pytorch'] = PyTorch
-except ModuleNotFoundError:
-    logger.info('PyTorch not installed...')
-
-try:
-    from detectors.deepstack import DeepStack
-    detectors['deepstack'] = DeepStack
-except ModuleNotFoundError:
-    logger.info('DeepStack not installed...')
-
-try:
-    from detectors.tensorflow2 import Tensorflow2
-    detectors['tensorflow2'] = Tensorflow2
-except ModuleNotFoundError:
-    logger.info("Tensorflow2 Object Detection API not installed...")
 
 font                   = cv2.FONT_HERSHEY_PLAIN
 fontScale              = 1.2
@@ -51,13 +31,6 @@ detect_request_image_conversion = {
     'image/png' : '.png',
 }
 
-detectors_load_precedence = [
-    "tflite",
-    "tensorflow",
-    "tensorflow2",
-    "deepstack",
-    "pytorch",
-]
 
 class MissingDetector:
     def __init__(self, dconfig):
@@ -67,7 +40,7 @@ class Doods:
     def __init__(self, config):
         self.config = config
 
-        self.config.detectors = sorted(self.config.detectors, key=lambda d: detectors_load_precedence.index(d.type) if d.type in detectors_load_precedence else 99)
+        self.config.detectors = self.config.detectors
 
         # Initialize the detectors
         self._detectors = {}
@@ -108,15 +81,6 @@ class Doods:
         # Already an image
         if type(detect.data) is np.ndarray:
             image = detect.data
-
-        # If it's a url, use cv2 to read an image or frame.
-        elif detect.data.startswith("http") or detect.data.startswith("rtsp") or detect.data.startswith("ftp"):
-            cap = cv2.VideoCapture(detect.data)
-            if cap.isOpened():
-                _, image = cap.read()
-                cap.release()
-            else:
-                raise 'No Image'
         
         # Should be base64 encoded image
         else:

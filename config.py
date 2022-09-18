@@ -1,14 +1,10 @@
 from typing import List, Optional
 from pydantic import BaseSettings, Extra
-from odrpc import MqttDetectRequest
 
 class DoodsDetectorConfig(BaseSettings):
     name: str
     type: str
     modelFile: str
-    labelFile: Optional[str]
-    hwAccel: Optional[bool] = False
-    numThreads: Optional[int] = 2
     class Config:
         extra = Extra.ignore
 
@@ -60,27 +56,7 @@ class ServerConfig(BaseSettings):
         env_prefix = 'server_'
         extra = Extra.ignore
 
-class MqttBrokerConfig(BaseSettings):
-    host: Optional[str] = 'localhost'
-    port: Optional[int] = 1883
-    user: Optional[str] = None
-    password: Optional[str] = None
-    class Config:
-        env_prefix = 'mqttbroker_'
-        extra = Extra.ignore
-
-class MqttConfig(BaseSettings):
-    broker: MqttBrokerConfig
-    requests: List[MqttDetectRequest]
-    metrics: Optional[bool] = True
-    class Config:
-        env_prefix = 'mqtt_'
-        extra = Extra.ignore
-
 class Config(BaseSettings):
     logger: Optional[LoggerConfig] = LoggerConfig()
     server: Optional[ServerConfig] = ServerConfig()
     doods: DoodsConfig
-    mqtt: Optional[MqttConfig]
-    class Config:
-        extra = Extra.ignore

@@ -6,6 +6,7 @@ testing.yaml
 *.jpg
 *.png
 *.pt
+env
 models
 private
 docker

@@ -1,9 +1,6 @@
-import numpy as np
-import cv2
 import odrpc
 import logging
 from config import DoodsDetectorConfig
-from detectors.labels import load_labels
 import torch
 
 class PyTorch:
@@ -15,7 +12,7 @@ class PyTorch:
             'model': config.modelFile,
         })
         self.logger = logging.getLogger("doods.pytorch."+config.name)
-        self.device = torch.device("cuda:0" if config.hwAccel else "cpu")
+        self.device = torch.device("cpu")
         repo, modelName = config.modelFile.split(',',1)
         self.torch_model = torch.hub.load(repo.strip(), modelName.strip())
         if isinstance(self.torch_model.names, dict):
